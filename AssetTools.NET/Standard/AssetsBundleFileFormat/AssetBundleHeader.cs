@@ -61,10 +61,6 @@ namespace AssetsTools.NET
                     NeedAlignAfterHeader = bytes.All(x => x == 0);
                     reader.Position = p;
                 }
-                else
-                {
-                    NeedAlignAfterHeader = false;
-                }
             }
             else
             {

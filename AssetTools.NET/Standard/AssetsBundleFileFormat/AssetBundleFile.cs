@@ -303,6 +303,8 @@ namespace AssetsTools.NET
                     )
                 }
             };
+            
+            newBundleHeader.NeedAlignAfterHeader = Header.NeedAlignAfterHeader;
 
             long fileSize = newBundleHeader.GetFileDataOffset();
             for (int i = 0; i < blockInfos.Length; i++)
