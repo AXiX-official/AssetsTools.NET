@@ -36,6 +36,12 @@ namespace AssetsTools.NET
         /// Header for bundles with a UnityFS Signature.
         /// </summary>
         public AssetBundleFSHeader FileStreamHeader { get; set; }
+        
+        public bool DataIsEncrypted { get; private set; }
+        
+        public AssetBundleFSHeaderFlags Mask { get; private set; }
+        
+        private bool HasBlockInfoNeedPaddingAtStart { get; set; }
 
         public void Read(AssetsFileReader reader)
         {
@@ -60,6 +66,25 @@ namespace AssetsTools.NET
                     byte[] bytes = reader.ReadBytes((int)len);
                     NeedAlignAfterHeader = bytes.All(x => x == 0);
                     reader.Position = p;
+                }
+                
+                if (PrasedEngineVersion[0] < 2020 || //2020 and earlier
+                    (PrasedEngineVersion[0] == 2020 && PrasedEngineVersion[1] == 3 && PrasedEngineVersion[2] <= 34) || //2020.3.34 and earlier
+                    (PrasedEngineVersion[0] == 2021 && PrasedEngineVersion[1] == 3 && PrasedEngineVersion[2] <= 2) || //2021.3.2 and earlier
+                    (PrasedEngineVersion[0] == 2022 && PrasedEngineVersion[1] == 3 && PrasedEngineVersion[2] <= 1)) //2022.3.1 and earlier
+                {
+                    Mask = AssetBundleFSHeaderFlags.BlockInfoNeedPaddingAtStart;
+                    HasBlockInfoNeedPaddingAtStart = false;
+                }
+                else
+                {
+                    Mask = AssetBundleFSHeaderFlags.UnityCNEncryption;
+                    HasBlockInfoNeedPaddingAtStart = true;
+                }
+
+                if ((FileStreamHeader.Flags & Mask) != 0)
+                {
+                    DataIsEncrypted = true;
                 }
             }
             else
@@ -107,6 +132,8 @@ namespace AssetsTools.NET
                 {
                     if ((flags & AssetBundleFSHeaderFlags.OldWebPluginCompatibility) != 0)
                         return ((ret + 0x0a) + 15) & ~15;
+                    else if (DataIsEncrypted)
+                        return ((ret + Signature.Length + 1 + 0x46) + 15) & ~15;
                     else
                         return ((ret + Signature.Length + 1) + 15) & ~15;
                 }
@@ -114,6 +141,8 @@ namespace AssetsTools.NET
                 {
                     if ((flags & AssetBundleFSHeaderFlags.OldWebPluginCompatibility) != 0)
                         return ret + 0x0a;
+                    else if (DataIsEncrypted)
+                        return ret + Signature.Length + 1 + 0x46;
                     else
                         return ret + Signature.Length + 1;
                 }
@@ -133,12 +162,14 @@ namespace AssetsTools.NET
                 ret += 0x0a;
             else
                 ret += Signature.Length + 1;
-
+            
+            if (DataIsEncrypted)
+                ret += 0x46;
             if (NeedAlignAfterHeader)
                 ret = (ret + 15) & ~15;
             if ((flags & AssetBundleFSHeaderFlags.BlockAndDirAtEnd) == 0)
                 ret += compressedSize;
-            if ((flags & AssetBundleFSHeaderFlags.BlockInfoNeedPaddingAtStart) != 0)
+            if (HasBlockInfoNeedPaddingAtStart && (flags & AssetBundleFSHeaderFlags.BlockInfoNeedPaddingAtStart) != 0)
                 ret = (ret + 15) & ~15;
 
             return ret;

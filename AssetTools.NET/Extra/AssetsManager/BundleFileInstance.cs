@@ -33,6 +33,11 @@ namespace AssetsTools.NET.Extra
             loadedAssetsFiles = new List<AssetsFileInstance>();
         }
 
+        public void SetUnityCNKey(string key)
+        {
+            file.SetUnityCNKey(key);
+        }
+
         public BundleFileInstance(FileStream stream, bool unpackIfPacked = true)
             : this(stream, stream.Name, unpackIfPacked)
         {

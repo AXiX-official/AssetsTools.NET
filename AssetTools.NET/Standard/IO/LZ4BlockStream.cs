@@ -18,6 +18,9 @@ namespace AssetsTools.NET
         private readonly Dictionary<int, MemoryStream> decompressedBlockMap;
         private readonly Queue<int> decompressedBlockQueue;
 
+        private bool Encrypt;
+        private AssetBundleUnityCN UnityCN;
+
         public int maxBlockMapSize;
         public const int DEFAULT_MAX_BLOCK_MAP_SIZE = 382; // roughly 50mb of cache
 
@@ -85,6 +88,16 @@ namespace AssetsTools.NET
             BaseOffset = baseOffset;
         }
 
+        public LZ4BlockStream(
+            Stream baseStream, long baseOffset, AssetBundleBlockInfo[] blockInfos,
+            AssetBundleUnityCN unityCN,
+            int maxBlockMapSize = DEFAULT_MAX_BLOCK_MAP_SIZE
+        ) : this(baseStream, baseOffset, blockInfos, maxBlockMapSize)
+        {
+            Encrypt = true;
+            UnityCN = unityCN;
+        }
+
         public Stream BaseStream
         {
             get;
@@ -143,6 +156,12 @@ namespace AssetsTools.NET
                     else if (compressionType == 2 || compressionType == 3)
                     {
                         byte[] blockData = new byte[blockInfos[blockIndex].DecompressedSize];
+                        if (Encrypt)
+                        {
+                            byte[] tempData = compressedStream.ToArray();
+                            UnityCN.DecryptBlock(tempData, tempData.Length, blockIndex);
+                            compressedStream = new MemoryStream(tempData);
+                        }
                         using (Lz4DecoderStream decoder = new Lz4DecoderStream(compressedStream))
                         {
                             decoder.Read(blockData, 0, blockData.Length);

@@ -27,6 +27,8 @@ namespace AssetsTools.NET
         /// Is data reader reading compressed data? Only LZMA bundles set this to true.
         /// </summary>
         public bool DataIsCompressed { get; set; }
+        
+        public AssetBundleUnityCN UnityCN { get; private set; }
 
         public AssetsFileReader Reader;
 
@@ -55,6 +57,11 @@ namespace AssetsTools.NET
                 {
                     reader.Align16();
                 }
+                
+                if (Header.DataIsEncrypted)
+                {
+                    UnityCN = new AssetBundleUnityCN(reader);
+                }
 
                 if (Header.Signature == "UnityFS")
                 {
@@ -69,6 +76,11 @@ namespace AssetsTools.NET
             {
                 new NotImplementedException($"Version {version} bundles are not supported yet.");
             }
+        }
+
+        public void SetUnityCNKey(string key)
+        {
+            UnityCN.SetKey(key);
         }
 
         public void Write(AssetsFileWriter writer, List<BundleReplacer> replacers, ClassDatabaseFile typeMeta = null)
@@ -305,6 +317,11 @@ namespace AssetsTools.NET
             };
             
             newBundleHeader.NeedAlignAfterHeader = Header.NeedAlignAfterHeader;
+            
+            if (Header.DataIsEncrypted)
+            {
+                newBundleHeader.FileStreamHeader.Flags &= ~Header.Mask;
+            }
 
             long fileSize = newBundleHeader.GetFileDataOffset();
             for (int i = 0; i < blockInfos.Length; i++)
@@ -330,6 +347,10 @@ namespace AssetsTools.NET
                     // Set compression to none
                     Flags = (ushort)(blockInfos[i].Flags & (~0x3f))
                 };
+                if (Header.DataIsEncrypted)
+                {
+                    newBundleInf.BlockInfos[i].Flags = (ushort)(newBundleInf.BlockInfos[i].Flags & (~0x100));
+                }
             }
 
             for (int i = 0; i < newBundleInf.DirectoryInfos.Length; i++)
@@ -699,7 +720,15 @@ namespace AssetsTools.NET
                 }
                 case AssetBundleCompressionType.LZ4:
                 {
-                    LZ4BlockStream dataStream = new LZ4BlockStream(Reader.BaseStream, Header.GetFileDataOffset(), BlockAndDirInfo.BlockInfos);
+                    LZ4BlockStream dataStream;
+                    if (Header.DataIsEncrypted)
+                    {
+                        dataStream = new LZ4BlockStream(Reader.BaseStream, Header.GetFileDataOffset(), BlockAndDirInfo.BlockInfos, UnityCN);
+                    }
+                    else
+                    {
+                        dataStream = new LZ4BlockStream(Reader.BaseStream, Header.GetFileDataOffset(), BlockAndDirInfo.BlockInfos);
+                    }
                     DataReader = new AssetsFileReader(dataStream);
                     DataIsCompressed = false;
                     break;
