@@ -52,15 +52,15 @@ namespace AssetsTools.NET
 
                 Header = new AssetBundleHeader();
                 Header.Read(reader);
-
-                if (Header.NeedAlignAfterHeader)
-                {
-                    reader.Align16();
-                }
                 
                 if (Header.DataIsEncrypted)
                 {
                     UnityCN = new AssetBundleUnityCN(reader);
+                }
+                
+                if (Header.NeedAlignAfterHeader)
+                {
+                    reader.Align16();
                 }
 
                 if (Header.Signature == "UnityFS")
